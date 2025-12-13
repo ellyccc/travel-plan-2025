@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>日系極簡旅遊手札</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* 日系極簡風格設定 */
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --border-color: #555555;
+            --accent-gray: #e5e5e5;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Heiti TC', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 隱藏滾動條但保持功能 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* 自定義邊框風格 */
+        .jp-border {
+            border: 1px solid var(--border-color);
+        }
+        
+        /* 輸入框樣式 */
+        input, select, textarea {
+            background: transparent;
+            border-bottom: 1px solid #ccc;
+            outline: none;
+            padding: 4px;
+            transition: border-color 0.3s;
+            width: 100%;
+            color: var(--text-main);
+            border-radius: 0;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-bottom: 1px solid var(--text-main);
+        }
+
+        /* 標籤切換樣式 */
+        .tab-btn.active {
+            border-bottom: 2px solid var(--text-main);
+            font-weight: bold;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #333;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden max-w-md mx-auto shadow-2xl bg-white border-x border-gray-300">
+
+    <header class="bg-[#f9f9f9] p-4 pb-2 z-20 shadow-sm">
+        <div class="flex justify-between items-start mb-2">
+            <div class="w-full">
+                <input type="text" id="tripTitle" value="東京五日遊" class="text-2xl font-bold bg-transparent border-none focus:ring-0 p-0 w-full mb-1" placeholder="輸入旅行標題...">
+                <div class="flex gap-2 text-sm text-gray-600 items-center">
+                    <input type="date" id="startDate" class="w-28 text-xs bg-transparent border-none" onchange="app.calculateDates()">
+                    <span>to</span>
+                    <input type="date" id="endDate" class="w-28 text-xs bg-transparent border-none" onchange="app.calculateDates()">
+                </div>
+            </div>
+            <button onclick="app.exportPDF()" class="text-xs border border-[#333] px-2 py-1 rounded hover:bg-[#333] hover:text-white transition">
+                <i class="fas fa-file-pdf"></i> PDF
+            </button>
+        </div>
+
+        <div class="flex justify-between mt-4 border-b border-gray-200 text-sm">
+            <button onclick="app.switchTab('itinerary')" class="tab-btn active px-3 py-2" id="tab-itinerary">行程</button>
+            <button onclick="app.switchTab('lists')" class="tab-btn px-3 py-2" id="tab-lists">清單</button>
+            <button onclick="app.switchTab('money')" class="tab-btn px-3 py-2" id="tab-money">分帳</button>
+            <button onclick="app.switchTab('settings')" class="tab-btn px-3 py-2" id="tab-settings">設定</button>
+        </div>
+    </header>
+
+    <main id="mainContent" class="flex-1 overflow-y-auto no-scrollbar relative bg-stone-50 p-4">
+        
+        <div id="view-itinerary" class="view-section space-y-6 pb-20">
+            
+            <div class="bg-white p-4 jp-border shadow-sm mb-6 space-y-6">
+                <div>
+                    <h3 class="font-bold border-b border-gray-200 pb-1 mb-2 text-sm flex justify-between">
+                        <span><i class="fas fa-plane-departure"></i> 去程航班</span>
+                        <span id="flightDurationOut" class="text-xs font-normal text-gray-500"></span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Airline / Flight No.</label>
+                            <input type="text" id="flightNumOut" placeholder="JL096" onchange="app.saveData()">
+                        </div>
+                        <div></div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Departure</label>
+                            <div class="flex gap-1">
+                                <input type="time" id="depTimeOut" class="w-16" onchange="app.calcFlights()">
+                                <input type="text" id="depPlaceOut" placeholder="TPE T2" onchange="app.saveData()">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Arrival</label>
+                            <div class="flex gap-1">
+                                <input type="time" id="arrTimeOut" class="w-16" onchange="app.calcFlights()">
+                                <input type="text" id="arrPlaceOut" placeholder="HND T3" onchange="app.saveData()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-bold border-b border-gray-200 pb-1 mb-2 text-sm flex justify-between">
+                        <span><i class="fas fa-plane-arrival"></i> 回程航班</span>
+                        <span id="flightDurationIn" class="text-xs font-normal text-gray-500"></span>
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Airline / Flight No.</label>
+                            <input type="text" id="flightNumIn" placeholder="JL099" onchange="app.saveData()">
+                        </div>
+                        <div></div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Departure</label>
+                            <div class="flex gap-1">
+                                <input type="time" id="depTimeIn" class="w-16" onchange="app.calcFlights()">
+                                <input type="text" id="depPlaceIn" placeholder="HND T3" onchange="app.saveData()">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Arrival</label>
+                            <div class="flex gap-1">
+                                <input type="time" id="arrTimeIn" class="w-16" onchange="app.calcFlights()">
+                                <input type="text" id="arrPlaceIn" placeholder="TPE T2" onchange="app.saveData()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="itineraryContainer"></div>
+        </div>
+
+        <div id="view-lists" class="view-section hidden space-y-6 pb-20">
+            <div class="bg-white p-4 jp-border shadow-sm">
+                <h3 class="font-bold border-b border-gray-200 pb-2 mb-3 text-sm flex justify-between items-center">
+                    <span><i class="fas fa-suitcase"></i> 行李清單</span>
+                    <button onclick="app.addItem('packing')" class="text-lg">+</button>
+                </h3>
+                <ul id="packingListUl" class="space-y-2"></ul>
+            </div>
+
+            <div class="bg-white p-4 jp-border shadow-sm">
+                <h3 class="font-bold border-b border-gray-200 pb-2 mb-3 text-sm flex justify-between items-center">
+                    <span><i class="fas fa-shopping-cart"></i> 購物清單</span>
+                    <button onclick="app.addItem('shopping')" class="text-lg">+</button>
+                </h3>
+                <ul id="shoppingListUl" class="space-y-4"></ul>
+            </div>
+        </div>
+
+        <div id="view-money" class="view-section hidden space-y-6 pb-20">
+            <div class="bg-white p-4 jp-border shadow-sm">
+                <h3 class="font-bold mb-3 text-sm">匯率設定</h3>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm">1 外幣 = </span>
+                    <input type="number" id="exchangeRate" class="w-16 text-center" placeholder="0.23" onchange="app.saveData()">
+                    <span class="text-sm">台幣</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 jp-border shadow-sm">
+                <h3 class="font-bold border-b border-gray-200 pb-2 mb-3 text-sm flex justify-between items-center">
+                    <span><i class="fas fa-file-invoice-dollar"></i> 記帳 & 分帳</span>
+                </h3>
+                
+                <div class="mb-4 text-sm">
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="newMemberName" placeholder="成員姓名">
+                        <button onclick="app.addMember()" class="border border-gray-600 px-2 rounded">新增</button>
+                    </div>
+                    <div id="membersTags" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="bg-gray-50 p-3 rounded mb-4 text-sm border border-gray-200">
+                    <input type="text" id="expenseTitle" placeholder="消費項目 (例如: 晚餐)" class="mb-2">
+                    <div class="flex gap-2 mb-2">
+                        <input type="number" id="expenseAmount" placeholder="外幣金額" class="flex-1" oninput="app.calcPreviewTWD()">
+                        <select id="expensePayer" class="flex-1 bg-transparent border-b border-ccc"></select>
+                    </div>
+                    <div class="text-right text-xs text-gray-500 mb-2" id="expensePreview">約 TWD 0</div>
+                    <button onclick="app.addExpense()" class="w-full bg-[#333] text-white py-1 rounded">新增款項</button>
+                </div>
+
+                <ul id="expenseListUl" class="text-sm space-y-2"></ul>
+            </div>
+        </div>
+
+        <div id="view-settings" class="view-section hidden space-y-6 pb-20">
+            <div class="bg-white p-4 jp-border shadow-sm">
+                <h3 class="font-bold border-b border-gray-200 pb-2 mb-3 text-sm">資料管理 (公版分享)</h3>
+                <p class="text-xs text-gray-500 mb-4">您可以將資料匯出成文字檔傳給朋友，或貼上朋友分享的代碼來匯入行程。</p>
+                
+                <div class="flex gap-2 mb-4">
+                    <button onclick="app.exportJSON()" class="flex-1 border border-gray-600 py-2 rounded text-sm hover:bg-gray-100">匯出資料</button>
+                    <label class="flex-1 border border-gray-600 py-2 rounded text-sm text-center hover:bg-gray-100 cursor-pointer">
+                        匯入資料
+                        <input type="file" class="hidden" onchange="app.importJSON(this)">
+                    </label>
+                </div>
+                
+                <button onclick="app.clearData()" class="w-full text-red-500 text-xs mt-8">清除所有資料 (重置)</button>
+            </div>
+        </div>
+
+    </main>
+
+    <button id="fabAdd" onclick="app.showAddModal()" class="fixed bottom-6 right-6 bg-[#333] text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl z-50 hover:scale-110 transition">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-end sm:items-center justify-center">
+        <div class="bg-white w-full max-w-md p-6 rounded-t-xl sm:rounded-xl shadow-2xl animate-slide-up sm:animate-fade-in max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold mb-4" id="modalTitle">新增行程</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-500">日期</label>
+                    <select id="modalDate" class="w-full p-2 bg-gray-50 border border-gray-200 rounded"></select>
+                </div>
+                <div class="flex gap-2">
+                    <div class="w-1/3">
+                        <label class="block text-xs text-gray-500">時間</label>
+                        <input type="time" id="modalTime" class="w-full">
+                    </div>
+                    <div class="w-2/3">
+                        <label class="block text-xs text-gray-500">分類</label>
+                        <select id="modalType" class="w-full">
+                            <option value="景點">景點</option>
+                            <option value="美食">美食</option>
+                            <option value="逛街">逛街</option>
+                            <option value="演唱會">演唱會</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500">地點名稱 (僅用於天氣預測)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="modalLocation" placeholder="例如：東京鐵塔" class="flex-1">
+                    </div>
+                </div>
+                 <div>
+                    <label class="block text-xs text-gray-500">Google Maps 連結 (選填)</label>
+                    <input type="text" id="modalMapUrl" placeholder="https://goo.gl/maps/..." class="text-xs">
+                    <p class="text-[10px] text-gray-400 mt-1">請貼上 Google 地圖的分享連結</p>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500">備註</label>
+                    <textarea id="modalNote" rows="3" class="w-full border border-gray-200 rounded p-2 text-sm" placeholder="地圖備註、交通方式..."></textarea>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button onclick="document.getElementById('addModal').classList.add('hidden')" class="flex-1 py-2 border border-gray-300 rounded text-gray-600">取消</button>
+                <button id="modalSaveBtn" onclick="app.saveItineraryItem()" class="flex-1 py-2 bg-[#333] text-white rounded">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === Core Application Logic ===
+        const app = {
+            data: {
+                title: "我的東京之旅",
+                startDate: new Date().toISOString().split('T')[0],
+                endDate: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0],
+                flightOut: { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' },
+                flightIn: { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' },
+                
+                // Itinerary Item Structure Changed: removed 'img', added 'mapUrl'
+                itinerary: [], 
+                packingList: [],
+                shoppingList: [],
+                members: ['我'],
+                expenses: [], 
+                rate: 0.23
+            },
+            editingId: null,
+
+            init: function() {
+                this.loadData();
+                this.setupUI();
+                this.renderAll();
+            },
+
+            // --- Data Persistence ---
+            saveData: function() {
+                this.data.title = document.getElementById('tripTitle').value;
+                this.data.startDate = document.getElementById('startDate').value;
+                this.data.endDate = document.getElementById('endDate').value;
+                
+                // Outbound
+                this.data.flightOut.num = document.getElementById('flightNumOut').value;
+                this.data.flightOut.depTime = document.getElementById('depTimeOut').value;
+                this.data.flightOut.arrTime = document.getElementById('arrTimeOut').value;
+                this.data.flightOut.depPlace = document.getElementById('depPlaceOut').value;
+                this.data.flightOut.arrPlace = document.getElementById('arrPlaceOut').value;
+                
+                // Inbound
+                this.data.flightIn.num = document.getElementById('flightNumIn').value;
+                this.data.flightIn.depTime = document.getElementById('depTimeIn').value;
+                this.data.flightIn.arrTime = document.getElementById('arrTimeIn').value;
+                this.data.flightIn.depPlace = document.getElementById('depPlaceIn').value;
+                this.data.flightIn.arrPlace = document.getElementById('arrPlaceIn').value;
+
+                this.data.rate = parseFloat(document.getElementById('exchangeRate').value) || 0.23;
+
+                localStorage.setItem('travelApp_v1', JSON.stringify(this.data));
+                this.renderAll(); 
+            },
+
+            loadData: function() {
+                const saved = localStorage.getItem('travelApp_v1');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    this.data = { ...this.data, ...parsed };
+                    if(!this.data.flightOut) this.data.flightOut = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
+                    if(!this.data.flightIn) this.data.flightIn = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
+                }
+                document.getElementById('tripTitle').value = this.data.title;
+                document.getElementById('startDate').value = this.data.startDate;
+                document.getElementById('endDate').value = this.data.endDate;
+                
+                document.getElementById('flightNumOut').value = this.data.flightOut.num || '';
+                document.getElementById('depTimeOut').value = this.data.flightOut.depTime || '';
+                document.getElementById('arrTimeOut').value = this.data.flightOut.arrTime || '';
+                document.getElementById('depPlaceOut').value = this.data.flightOut.depPlace || '';
+                document.getElementById('arrPlaceOut').value = this.data.flightOut.arrPlace || '';
+
+                document.getElementById('flightNumIn').value = this.data.flightIn.num || '';
+                document.getElementById('depTimeIn').value = this.data.flightIn.depTime || '';
+                document.getElementById('arrTimeIn').value = this.data.flightIn.arrTime || '';
+                document.getElementById('depPlaceIn').value = this.data.flightIn.depPlace || '';
+                document.getElementById('arrPlaceIn').value = this.data.flightIn.arrPlace || '';
+
+                document.getElementById('exchangeRate').value = this.data.rate;
+                
+                this.calcFlights();
+            },
+
+            // --- UI Rendering ---
+            setupUI: function() {
+                this.switchTab('itinerary');
+                document.getElementById('startDate').addEventListener('change', () => this.saveData());
+                document.getElementById('endDate').addEventListener('change', () => this.saveData());
+            },
+
+            renderAll: function() {
+                this.calculateDates();
+                this.renderLists();
+                this.renderMoney();
+            },
+
+            switchTab: function(tabName) {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                
+                document.getElementById(`view-${tabName}`).classList.remove('hidden');
+                document.getElementById(`tab-${tabName}`).classList.add('active');
+
+                const fab = document.getElementById('fabAdd');
+                fab.style.display = (tabName === 'itinerary') ? 'flex' : 'none';
+            },
+
+            // --- Flight & Dates ---
+            calcFlights: function() {
+                this.calcDuration('depTimeOut', 'arrTimeOut', 'flightDurationOut');
+                this.calcDuration('depTimeIn', 'arrTimeIn', 'flightDurationIn');
+                this.saveData(); 
+            },
+
+            calcDuration: function(idStart, idEnd, idDisplay) {
+                const dep = document.getElementById(idStart).value;
+                const arr = document.getElementById(idEnd).value;
+                const displayEl = document.getElementById(idDisplay);
+                
+                if(dep && arr) {
+                    let d = new Date("2000-01-01 " + dep);
+                    let a = new Date("2000-01-01 " + arr);
+                    if (a < d) a.setDate(a.getDate() + 1); 
+                    let diffMs = a - d;
+                    let diffHrs = Math.floor((diffMs % 86400000) / 3600000); 
+                    let diffMins = Math.round(((diffMs % 86400000) % 3600000) / 60000); 
+                    displayEl.innerText = `${diffHrs}h ${diffMins}m`;
+                } else {
+                    displayEl.innerText = "";
+                }
+            },
+
+            calculateDates: function() {
+                const container = document.getElementById('itineraryContainer');
+                container.innerHTML = '';
+                const modalDateSelect = document.getElementById('modalDate');
+                modalDateSelect.innerHTML = '';
+
+                let start = new Date(this.data.startDate);
+                let end = new Date(this.data.endDate);
+                
+                const dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    const dayName = dayNames[d.getDay()];
+                    const fullYear = d.getFullYear();
+                    const monthDate = `${d.getMonth()+1}/${d.getDate()}`;
+
+                    let option = document.createElement('option');
+                    option.value = dateStr;
+                    option.text = `${dateStr} (${dayName})`;
+                    modalDateSelect.appendChild(option);
+
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'mb-8 relative';
+                    
+                    dayDiv.innerHTML = `
+                        <div class="flex items-end border-b-2 border-gray-800 pb-1 mb-4">
+                            <div class="text-4xl font-bold mr-2">${dayName}</div>
+                            <div class="text-sm text-gray-500 mb-1">${fullYear} ${monthDate}</div>
+                            <div class="ml-auto text-xs bg-gray-200 px-2 py-1 rounded weather-tag" data-date="${dateStr}">
+                                <i class="fas fa-spinner fa-spin"></i> 天氣
+                            </div>
+                        </div>
+                        <div class="itinerary-list min-h-[50px] space-y-3" id="list-${dateStr}"></div>
+                    `;
+                    container.appendChild(dayDiv);
+
+                    const dayItems = this.data.itinerary.filter(i => i.date === dateStr).sort((a,b) => a.time.localeCompare(b.time));
+                    const listContainer = dayDiv.querySelector(`#list-${dateStr}`);
+                    
+                    dayItems.forEach(item => {
+                        const el = this.createItineraryElement(item);
+                        listContainer.appendChild(el);
+                    });
+
+                    new Sortable(listContainer, {
+                        animation: 150,
+                        onEnd: (evt) => { }
+                    });
+
+                    this.fetchWeather(dateStr, dayDiv.querySelector('.weather-tag'));
+                }
+            },
+
+            createItineraryElement: function(item) {
+                const div = document.createElement('div');
+                div.className = 'bg-white p-3 border-l-4 border-gray-600 shadow-sm relative group';
+                
+                let typeColor = 'bg-gray-200';
+                if(item.type === '美食') typeColor = 'bg-orange-100 text-orange-800';
+                if(item.type === '逛街') typeColor = 'bg-blue-100 text-blue-800';
+                if(item.type === '演唱會') typeColor = 'bg-purple-100 text-purple-800';
+
+                // Map Link Button Logic
+                let mapBtnHtml = '';
+                if(item.mapUrl) {
+                    mapBtnHtml = `
+                        <a href="${item.mapUrl}" target="_blank" class="block mt-2 text-center text-xs border border-gray-400 text-gray-600 rounded py-1 hover:bg-gray-100 transition">
+                            <i class="fas fa-location-arrow"></i> 導航
+                        </a>
+                    `;
+                }
+
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-mono font-bold text-lg">${item.time}</span>
+                                <span class="text-xs px-1 rounded ${typeColor}">${item.type}</span>
+                            </div>
+                            <div class="font-bold text-base text-[#333]">${item.location}</div>
+                            
+                            <details class="mt-2 text-xs text-gray-500 w-full" ${item.note ? 'open' : ''}>
+                                <summary class="cursor-pointer hover:text-gray-800 list-none flex items-center gap-1">
+                                    <i class="fas fa-sticky-note text-gray-400"></i> ${item.note ? '備註' : '無備註'}
+                                </summary>
+                                <div class="mt-1 p-2 bg-gray-50 rounded">
+                                    ${item.note || ''}
+                                </div>
+                            </details>
+                            
+                            ${mapBtnHtml}
+
+                        </div>
+                        <div class="flex flex-col gap-2 ml-3">
+                            <button onclick="app.editItinerary('${item.id}')" class="text-gray-400 hover:text-blue-600">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button onclick="app.deleteItinerary('${item.id}')" class="text-gray-400 hover:text-red-500">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return div;
+            },
+
+            // --- Itinerary Actions ---
+            showAddModal: function() {
+                this.editingId = null; 
+                document.getElementById('modalTitle').innerText = "新增行程";
+                document.getElementById('modalSaveBtn').innerText = "儲存";
+                document.getElementById('addModal').classList.remove('hidden');
+                document.getElementById('modalTime').value = '10:00';
+                document.getElementById('modalLocation').value = '';
+                document.getElementById('modalNote').value = '';
+                document.getElementById('modalMapUrl').value = '';
+            },
+
+            editItinerary: function(id) {
+                const item = this.data.itinerary.find(i => i.id === id);
+                if (!item) return;
+
+                this.editingId = id; 
+                document.getElementById('modalTitle').innerText = "編輯行程";
+                document.getElementById('modalSaveBtn').innerText = "更新";
+                
+                // Fill inputs
+                document.getElementById('modalDate').value = item.date;
+                document.getElementById('modalTime').value = item.time;
+                document.getElementById('modalType').value = item.type;
+                document.getElementById('modalLocation').value = item.location;
+                document.getElementById('modalMapUrl').value = item.mapUrl || '';
+                document.getElementById('modalNote').value = item.note || '';
+
+                document.getElementById('addModal').classList.remove('hidden');
+            },
+
+            saveItineraryItem: async function() {
+                const loc = document.getElementById('modalLocation').value;
+                if(!loc) return alert('請輸入地點名稱 (用於天氣)');
+
+                const btn = document.getElementById('modalSaveBtn');
+                const originalText = btn.innerText;
+                btn.innerHTML = '<div class="loader inline-block"></div>';
+                
+                // We keep geocoding ONLY for weather purposes (background)
+                let lat = 35.6895, lng = 139.6917; 
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(loc)}`);
+                    const data = await res.json();
+                    if(data && data.length > 0) {
+                        lat = parseFloat(data[0].lat);
+                        lng = parseFloat(data[0].lon);
+                    }
+                } catch(e) { console.log("Geocode failed", e); }
+
+                const itemData = {
+                    id: this.editingId ? this.editingId : Date.now().toString(),
+                    date: document.getElementById('modalDate').value,
+                    time: document.getElementById('modalTime').value,
+                    type: document.getElementById('modalType').value,
+                    location: loc,
+                    lat: lat, // Saved for weather
+                    lng: lng, // Saved for weather
+                    note: document.getElementById('modalNote').value,
+                    mapUrl: document.getElementById('modalMapUrl').value // New Field
+                };
+
+                if (this.editingId) {
+                    const idx = this.data.itinerary.findIndex(i => i.id === this.editingId);
+                    if (idx !== -1) {
+                        this.data.itinerary[idx] = itemData;
+                    }
+                } else {
+                    this.data.itinerary.push(itemData);
+                }
+
+                this.saveData(); 
+                
+                // Reset & Close
+                this.editingId = null;
+                document.getElementById('modalLocation').value = '';
+                document.getElementById('modalNote').value = '';
+                document.getElementById('modalMapUrl').value = '';
+                document.getElementById('addModal').classList.add('hidden');
+                btn.innerText = originalText;
+            },
+
+            deleteItinerary: function(id) {
+                if(confirm('確定刪除此行程？')) {
+                    this.data.itinerary = this.data.itinerary.filter(i => i.id !== id);
+                    this.saveData();
+                }
+            },
+
+            // --- Weather API ---
+            fetchWeather: async function(dateStr, element) {
+                const dayItems = this.data.itinerary.filter(i => i.date === dateStr);
+                let lat = 35.6895, lng = 139.6917;
+                if (dayItems.length > 0) {
+                    lat = dayItems[0].lat;
+                    lng = dayItems[0].lng;
+                }
+
+                try {
+                    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    
+                    if(data.daily && data.daily.time.length > 0) {
+                        const min = data.daily.temperature_2m_min[0];
+                        const max = data.daily.temperature_2m_max[0];
+                        element.innerHTML = `${min}°C - ${max}°C`;
+                    } else {
+                        element.innerHTML = '無預報';
+                    }
+                } catch(e) {
+                    element.innerHTML = 'N/A';
+                }
+            },
+
+            // --- Lists ---
+            renderLists: function() {
+                const pUl = document.getElementById('packingListUl');
+                const sUl = document.getElementById('shoppingListUl');
+                pUl.innerHTML = '';
+                sUl.innerHTML = '';
+
+                this.data.packingList.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center gap-2 border-b border-gray-100 py-2';
+                    li.innerHTML = `
+                        <input type="checkbox" ${item.done ? 'checked' : ''} onchange="app.toggleList('packing', ${index})" class="w-5 h-5 accent-gray-700">
+                        <span class="flex-1 ${item.done ? 'line-through text-gray-300' : ''}">${item.text}</span>
+                        <button onclick="app.delListItem('packing', ${index})" class="text-gray-300"><i class="fas fa-times"></i></button>
+                    `;
+                    pUl.appendChild(li);
+                });
+
+                this.data.shoppingList.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-start gap-2 border-b border-gray-100 py-2';
+                    const imgHtml = item.img ? `<img src="${item.img}" class="w-12 h-12 object-cover rounded border">` : '';
+                    li.innerHTML = `
+                        <input type="checkbox" ${item.done ? 'checked' : ''} onchange="app.toggleList('shopping', ${index})" class="w-5 h-5 mt-1 accent-gray-700">
+                        <div class="flex-1">
+                            <div class="${item.done ? 'line-through text-gray-300' : ''}">${item.text}</div>
+                        </div>
+                        ${imgHtml}
+                        <button onclick="app.delListItem('shopping', ${index})" class="text-gray-300 mt-1"><i class="fas fa-times"></i></button>
+                    `;
+                    sUl.appendChild(li);
+                });
+            },
+
+            addItem: function(type) {
+                const text = prompt("請輸入項目名稱：");
+                if(!text) return;
+                
+                let img = null;
+                if(type === 'shopping') {
+                    const wantImg = confirm("要加入圖片嗎？");
+                    if(wantImg) img = prompt("請輸入圖片網址 (URL):");
+                }
+
+                this.data[type + 'List'].push({ text: text, done: false, img: img });
+                this.saveData();
+            },
+
+            toggleList: function(type, index) {
+                this.data[type + 'List'][index].done = !this.data[type + 'List'][index].done;
+                this.saveData();
+            },
+
+            delListItem: function(type, index) {
+                this.data[type + 'List'].splice(index, 1);
+                this.saveData();
+            },
+
+            // --- Money ---
+            renderMoney: function() {
+                const memDiv = document.getElementById('membersTags');
+                memDiv.innerHTML = '';
+                const payerSelect = document.getElementById('expensePayer');
+                payerSelect.innerHTML = '';
+
+                this.data.members.forEach((m, i) => {
+                    const tag = document.createElement('span');
+                    tag.className = "bg-gray-200 px-2 py-1 rounded text-xs flex items-center gap-1";
+                    tag.innerHTML = `${m} ${i>0 ? `<i onclick="app.delMember(${i})" class="fas fa-times cursor-pointer"></i>` : ''}`;
+                    memDiv.appendChild(tag);
+                    
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.text = m;
+                    payerSelect.appendChild(opt);
+                });
+
+                const ul = document.getElementById('expenseListUl');
+                ul.innerHTML = '';
+                this.data.expenses.forEach((ex, i) => {
+                    const twd = Math.round(ex.amount * this.data.rate);
+                    const li = document.createElement('li');
+                    li.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
+                    li.innerHTML = `
+                        <div>
+                            <div class="font-bold">${ex.title}</div>
+                            <div class="text-xs text-gray-500">${ex.payer} 付款</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold">¥${ex.amount}</div>
+                            <div class="text-xs text-gray-500">≈ $${twd}</div>
+                        </div>
+                        <button onclick="app.delExpense(${i})" class="ml-2 text-gray-300"><i class="fas fa-times"></i></button>
+                    `;
+                    ul.appendChild(li);
+                });
+            },
+
+            addMember: function() {
+                const name = document.getElementById('newMemberName').value;
+                if(name) {
+                    this.data.members.push(name);
+                    document.getElementById('newMemberName').value = '';
+                    this.saveData();
+                }
+            },
+
+            delMember: function(index) {
+                this.data.members.splice(index, 1);
+                this.saveData();
+            },
+
+            calcPreviewTWD: function() {
+                const amt = parseFloat(document.getElementById('expenseAmount').value) || 0;
+                const twd = Math.round(amt * this.data.rate);
+                document.getElementById('expensePreview').innerText = `約 TWD ${twd}`;
+            },
+
+            addExpense: function() {
+                const title = document.getElementById('expenseTitle').value;
+                const amount = parseFloat(document.getElementById('expenseAmount').value);
+                const payer = document.getElementById('expensePayer').value;
+
+                if(title && amount && payer) {
+                    this.data.expenses.push({ title, amount, payer });
+                    document.getElementById('expenseTitle').value = '';
+                    document.getElementById('expenseAmount').value = '';
+                    this.saveData();
+                }
+            },
+            
+            delExpense: function(index) {
+                this.data.expenses.splice(index, 1);
+                this.saveData();
+            },
+
+            // --- Export / Import ---
+            exportPDF: function() {
+                const element = document.getElementById('mainContent');
+                this.switchTab('itinerary');
+                const opt = {
+                    margin: 0,
+                    filename: 'MyTravelPlan.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+                html2pdf().set(opt).from(element).save();
+            },
+
+            exportJSON: function() {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "travel_data.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            },
+
+            importJSON: function(input) {
+                const file = input.files[0];
+                if(!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        this.data = json;
+                        this.saveData(); 
+                        alert("匯入成功！");
+                    } catch(err) {
+                        alert("檔案格式錯誤");
+                    }
+                };
+                reader.readAsText(file);
+            },
+            
+            clearData: function() {
+                if(confirm("確定清除所有資料？這將無法復原。")) {
+                    localStorage.removeItem('travelApp_v1');
+                    location.reload();
+                }
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+</body>
+</html>
