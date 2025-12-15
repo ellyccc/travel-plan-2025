@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>日本旅行計劃</title>
+    <title>日本旅遊計畫 App</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -54,6 +54,7 @@
             width: 100%;
             color: var(--text-main);
             border-radius: 0;
+            text-align: left; /* 強制靠左 */
         }
         input:focus, select:focus, textarea:focus {
             border-bottom: 1px solid var(--text-main);
@@ -83,20 +84,17 @@
     <header class="bg-[#f9f9f9] p-4 pb-2 z-20 shadow-sm">
         <div class="flex justify-between items-start mb-2">
             <div class="w-full pr-2">
-                <input type="text" id="tripTitle" class="text-2xl font-bold bg-transparent border-none focus:ring-0 p-0 w-full mb-1" placeholder="輸入旅行標題...">
+                <input type="text" id="tripTitle" class="text-2xl font-bold bg-transparent border-none focus:ring-0 p-0 w-full mb-1 text-left" placeholder="輸入旅行標題...">
                 
                 <div class="relative mb-2">
-                    <input type="text" id="tripDestination" class="text-sm w-full font-bold text-gray-700 placeholder-gray-400" 
-                           placeholder="輸入目的地 (如: Tokyo, London) 自動抓匯率" onchange="app.detectCurrency(this.value)">
-                    <div id="currencyLoader" class="absolute right-0 top-0 hidden">
-                        <i class="fas fa-spinner fa-spin text-gray-500"></i>
-                    </div>
+                    <input type="text" id="tripDestination" class="text-sm w-full font-bold text-gray-700 placeholder-gray-400 text-left" 
+                           placeholder="輸入目的地 (如: Tokyo)" onchange="app.saveData()">
                 </div>
 
                 <div class="flex gap-2 text-sm text-gray-600 items-center">
-                    <input type="date" id="startDate" class="w-28 text-xs bg-transparent border-none" onchange="app.calculateDates()">
+                    <input type="date" id="startDate" class="w-28 text-xs bg-transparent border-none text-left" onchange="app.calculateDates()">
                     <span>to</span>
-                    <input type="date" id="endDate" class="w-28 text-xs bg-transparent border-none" onchange="app.calculateDates()">
+                    <input type="date" id="endDate" class="w-28 text-xs bg-transparent border-none text-left" onchange="app.calculateDates()">
                 </div>
             </div>
             <button onclick="app.exportPDF()" class="text-xs border border-[#333] px-2 py-1 rounded hover:bg-[#333] hover:text-white transition whitespace-nowrap">
@@ -203,14 +201,12 @@
             <div class="bg-white p-4 jp-border shadow-sm mb-4">
                 <h3 class="font-bold mb-3 text-sm flex items-center justify-between">
                     <span>匯率設定</span>
-                    <span id="currencyCodeDisplay" class="text-xs bg-gray-200 px-2 py-1 rounded text-gray-600">偵測中...</span>
                 </h3>
                 <div class="flex items-center gap-2">
                     <span class="text-sm">1 外幣 = </span>
-                    <input type="number" id="exchangeRate" class="w-16 text-center" placeholder="0.23" onchange="app.saveData()">
+                    <input type="number" id="exchangeRate" class="w-16 text-center text-left" placeholder="0.23" onchange="app.saveData()">
                     <span class="text-sm">台幣 (TWD)</span>
                 </div>
-                <p class="text-[10px] text-gray-400 mt-2">輸入目的地後，系統將自動抓取匯率。</p>
             </div>
 
             <div class="bg-white p-4 jp-border shadow-sm">
@@ -305,7 +301,7 @@
                 </div>
                 <div>
                     <label class="block text-xs text-gray-500">備註</label>
-                    <textarea id="modalNote" rows="3" class="w-full border border-gray-200 rounded p-2 text-sm" placeholder="地圖備註、交通方式..."></textarea>
+                    <textarea id="modalNote" rows="3" class="w-full border border-gray-200 rounded p-2 text-sm text-left" placeholder="地圖備註、交通方式..."></textarea>
                 </div>
             </div>
 
@@ -333,8 +329,7 @@
                 shoppingList: [],
                 members: ['我'],
                 expenses: [], 
-                rate: 0.23,
-                currencyCode: 'JPY'
+                rate: 0.23 // Reverted to default JPY-like rate
             },
             editingId: null,
 
@@ -379,7 +374,6 @@
                     if(!this.data.flightOut) this.data.flightOut = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
                     if(!this.data.flightIn) this.data.flightIn = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
                     if(!this.data.destination) this.data.destination = "";
-                    if(!this.data.currencyCode) this.data.currencyCode = "Unknown";
                 }
                 document.getElementById('tripTitle').value = this.data.title;
                 document.getElementById('tripDestination').value = this.data.destination;
@@ -401,65 +395,6 @@
                 document.getElementById('exchangeRate').value = this.data.rate;
                 
                 this.calcFlights();
-                this.updateCurrencyDisplay();
-            },
-
-            // --- Auto Currency Detection Logic ---
-            detectCurrency: async function(destination) {
-                if(!destination) return;
-                
-                const loader = document.getElementById('currencyLoader');
-                loader.classList.remove('hidden');
-
-                try {
-                    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=1&language=en&format=json`);
-                    const geoData = await geoRes.json();
-                    
-                    if (!geoData.results || geoData.results.length === 0) {
-                         throw new Error("找不到該城市");
-                    }
-                    const countryCode = geoData.results[0].country_code.toLowerCase(); 
-
-                    const countryRes = await fetch(`https://restcountries.com/v3.1/alpha/${countryCode}`);
-                    const countryData = await countryRes.json();
-                    if (!countryData || !countryData[0] || !countryData[0].currencies) {
-                        throw new Error("無法辨識該國貨幣");
-                    }
-
-                    const currencies = countryData[0].currencies;
-                    const currencyCode = Object.keys(currencies)[0]; 
-                    
-                    this.data.currencyCode = currencyCode;
-
-                    if (currencyCode === 'TWD') {
-                        this.data.rate = 1;
-                    } else {
-                        const rateRes = await fetch(`https://api.frankfurter.app/latest?from=${currencyCode}&to=TWD`);
-                        if(!rateRes.ok) throw new Error("匯率來源不支援此貨幣");
-                        
-                        const rateData = await rateRes.json();
-                        this.data.rate = rateData.rates.TWD;
-                    }
-
-                    document.getElementById('exchangeRate').value = this.data.rate;
-                    this.saveData();
-                    alert(`已自動偵測匯率：1 ${currencyCode} = ${this.data.rate} TWD`);
-
-                } catch (error) {
-                    console.error(error);
-                    alert(`自動偵測失敗：${error.message || '未知錯誤'}，請手動輸入匯率。`);
-                } finally {
-                    loader.classList.add('hidden');
-                }
-            },
-            
-            updateCurrencyDisplay: function() {
-                const label = document.getElementById('currencyCodeDisplay');
-                if (this.data.currencyCode && this.data.currencyCode !== 'Unknown') {
-                    label.innerText = this.data.currencyCode;
-                } else {
-                    label.innerText = '手動設定';
-                }
             },
 
             // --- UI Rendering ---
@@ -473,7 +408,6 @@
                 this.calculateDates();
                 this.renderLists();
                 this.renderMoney();
-                this.updateCurrencyDisplay();
             },
 
             switchTab: function(tabName) {
@@ -603,20 +537,18 @@
 
                 div.innerHTML = `
                     <div class="flex justify-between items-start">
-                        <div class="flex-1">
+                        <div class="flex-1 text-left"> 
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="font-mono font-bold text-lg">${item.time}</span>
                                 <span class="text-xs px-1 rounded ${typeColor}">${item.type}</span>
                             </div>
                             <div class="font-bold text-base text-[#333]">${item.location}</div>
                             
-                            <details class="mt-2 text-xs text-gray-500 w-full" ${item.note ? 'open' : ''}>
-                                <summary class="cursor-pointer hover:text-gray-800 list-none flex items-center gap-1">
+                            <details class="mt-2 text-xs text-gray-500 w-full text-left" ${item.note ? 'open' : ''}>
+                                <summary class="cursor-pointer hover:text-gray-800 list-none flex items-center gap-1 justify-start text-left !text-left">
                                     <i class="fas fa-sticky-note text-gray-400"></i> ${item.note ? '備註' : '無備註'}
                                 </summary>
-                                <div class="mt-1 p-2 bg-gray-50 rounded whitespace-pre-wrap leading-relaxed text-left">
-                                    ${item.note || ''}
-                                </div>
+                                <div class="mt-1 p-2 bg-gray-50 rounded whitespace-pre-wrap leading-relaxed !text-left block text-left">${(item.note || '').trim()}</div>
                             </details>
                             
                             ${linksHtml}
@@ -694,7 +626,8 @@
                     location: loc,
                     lat: lat, 
                     lng: lng, 
-                    note: document.getElementById('modalNote').value,
+                    // Add trim() to remove surrounding whitespace
+                    note: document.getElementById('modalNote').value.trim(),
                     mapUrl: document.getElementById('modalMapUrl').value,
                     siteUrl: document.getElementById('modalSiteUrl').value 
                 };
@@ -852,7 +785,7 @@
                             <div class="text-xs text-gray-500">${ex.payer} 付款</div>
                         </div>
                         <div class="text-right">
-                            <div class="font-bold">${this.data.currencyCode !== 'Unknown' ? this.data.currencyCode : ''} ${ex.amount}</div>
+                            <div class="font-bold">¥${ex.amount}</div>
                             <div class="text-xs text-gray-500">≈ TWD ${twd}</div>
                         </div>
                         <button onclick="app.delExpense(${i})" class="ml-2 text-gray-300"><i class="fas fa-times"></i></button>
