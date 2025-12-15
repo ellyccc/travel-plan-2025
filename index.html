@@ -614,7 +614,7 @@
                                 <summary class="cursor-pointer hover:text-gray-800 list-none flex items-center gap-1">
                                     <i class="fas fa-sticky-note text-gray-400"></i> ${item.note ? '備註' : '無備註'}
                                 </summary>
-                                <div class="mt-1 p-2 bg-gray-50 rounded whitespace-pre-wrap leading-relaxed">
+                                <div class="mt-1 p-2 bg-gray-50 rounded whitespace-pre-wrap leading-relaxed text-left">
                                     ${item.note || ''}
                                 </div>
                             </details>
@@ -645,7 +645,7 @@
                 document.getElementById('modalLocation').value = '';
                 document.getElementById('modalNote').value = '';
                 document.getElementById('modalMapUrl').value = '';
-                document.getElementById('modalSiteUrl').value = ''; // Clear new field
+                document.getElementById('modalSiteUrl').value = ''; 
             },
 
             editItinerary: function(id) {
@@ -662,7 +662,7 @@
                 document.getElementById('modalType').value = item.type;
                 document.getElementById('modalLocation').value = item.location;
                 document.getElementById('modalMapUrl').value = item.mapUrl || '';
-                document.getElementById('modalSiteUrl').value = item.siteUrl || ''; // Fill new field
+                document.getElementById('modalSiteUrl').value = item.siteUrl || ''; 
                 document.getElementById('modalNote').value = item.note || '';
 
                 document.getElementById('addModal').classList.remove('hidden');
@@ -696,7 +696,7 @@
                     lng: lng, 
                     note: document.getElementById('modalNote').value,
                     mapUrl: document.getElementById('modalMapUrl').value,
-                    siteUrl: document.getElementById('modalSiteUrl').value // Save new field
+                    siteUrl: document.getElementById('modalSiteUrl').value 
                 };
 
                 if (this.editingId) {
