@@ -329,7 +329,8 @@
                 shoppingList: [],
                 members: ['我'],
                 expenses: [], 
-                rate: 0.23 // Reverted to default JPY-like rate
+                rate: 0.23,
+                currencyCode: 'JPY'
             },
             editingId: null,
 
@@ -865,8 +866,9 @@
                     try {
                         const json = JSON.parse(e.target.result);
                         this.data = json;
-                        this.saveData(); 
+                        localStorage.setItem('travelApp_v1', JSON.stringify(this.data));
                         alert("匯入成功！");
+                        location.reload();
                     } catch(err) {
                         alert("檔案格式錯誤");
                     }
