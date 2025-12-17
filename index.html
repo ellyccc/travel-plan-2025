@@ -835,16 +835,29 @@
 
             // --- Export / Import ---
             exportPDF: function() {
+                // Save current active tab so we can restore it later
+                const currentTab = document.querySelector('.tab-btn.active').id.replace('tab-', '');
+                
+                // Show ALL sections for the screenshot (except settings)
+                document.getElementById('view-itinerary').classList.remove('hidden');
+                document.getElementById('view-lists').classList.remove('hidden');
+                document.getElementById('view-money').classList.remove('hidden');
+                document.getElementById('view-settings').classList.add('hidden'); // Ensure settings is hidden
+
                 const element = document.getElementById('mainContent');
-                this.switchTab('itinerary');
+                
                 const opt = {
-                    margin: 0,
-                    filename: 'MyTravelPlan.pdf',
+                    margin: 0.2,
+                    filename: (this.data.title || 'MyTravelPlan') + '.pdf', // Use trip title
                     image: { type: 'jpeg', quality: 0.98 },
                     html2canvas: { scale: 2 },
                     jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
                 };
-                html2pdf().set(opt).from(element).save();
+
+                html2pdf().set(opt).from(element).save().then(() => {
+                    // Restore original view after download starts
+                    this.switchTab(currentTab);
+                });
             },
 
             exportJSON: function() {
@@ -866,9 +879,11 @@
                     try {
                         const json = JSON.parse(e.target.result);
                         this.data = json;
+                        // IMPORTANT: Save to localStorage immediately
                         localStorage.setItem('travelApp_v1', JSON.stringify(this.data));
                         alert("匯入成功！");
-                        location.reload();
+                        // FORCE RELOAD to prevent overwriting with empty inputs
+                        location.reload(); 
                     } catch(err) {
                         alert("檔案格式錯誤");
                     }
@@ -890,3 +905,4 @@
     </script>
 </body>
 </html>
+
