@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>日本旅遊計畫 App</title>
+    <title>我的旅遊計畫 App</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -14,24 +14,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
-        /* 日系極簡風格設定 */
-        :root {
-            --bg-color: #f5f5f5;
-            --card-bg: #ffffff;
-            --text-main: #333333;
-            --border-color: #555555;
-            --accent-gray: #e5e5e5;
-        }
-        
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
+        /* V3.4 強制捲動修復與樣式設定 */
+        html, body {
+            background-color: #f5f5f5;
+            color: #333333;
             font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Heiti TC', sans-serif;
             -webkit-font-smoothing: antialiased;
-            /* 改用 min-h-screen 讓高度自然延伸，解決卡死問題 */
+            /* 關鍵修正：強制允許垂直捲動，覆蓋所有舊設定 */
+            height: auto !important;
             min-height: 100vh;
+            overflow-y: auto !important;
+            overscroll-behavior-y: none; /* 防止 iOS 橡皮筋回彈感，增加 App 感 */
         }
 
+        /* 自定義邊框風格 */
+        .jp-border {
+            border: 1px solid #555555;
+        }
+        
         /* 輸入框樣式 */
         input, select, textarea {
             background: transparent;
@@ -40,20 +40,26 @@
             padding: 4px;
             transition: border-color 0.3s;
             width: 100%;
-            color: var(--text-main);
+            color: #333;
             border-radius: 0;
             text-align: left; /* 強制靠左 */
         }
         input:focus, select:focus, textarea:focus {
-            border-bottom: 1px solid var(--text-main);
+            border-bottom: 1px solid #333;
         }
 
         /* 標籤切換樣式 */
         .tab-btn.active {
-            border-bottom: 2px solid var(--text-main);
+            border-bottom: 2px solid #333;
             font-weight: bold;
         }
 
+        /* 拖曳時的樣式 (讓被拖曳的項目半透明) */
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #e5e5e5;
+        }
+        
         /* Loading Spinner */
         .loader {
             border: 2px solid #f3f3f3;
@@ -98,7 +104,9 @@
         </div>
     </header>
 
-    <main id="mainContent" class="p-4 pb-24"> <div id="view-itinerary" class="view-section space-y-6">
+    <main id="mainContent" class="p-4 pb-24"> 
+        
+        <div id="view-itinerary" class="view-section space-y-6">
             
             <div class="bg-white p-4 jp-border shadow-sm mb-6 space-y-6">
                 <div>
@@ -327,7 +335,7 @@
                     this.renderAll();
                 } catch(e) {
                     console.error("Init error", e);
-                    alert("資料讀取發生錯誤，嘗試重置...");
+                    // 默默處理錯誤，避免卡死
                 }
             },
 
@@ -361,8 +369,11 @@
             loadData: function() {
                 const saved = localStorage.getItem('travelApp_v1');
                 if (saved) {
-                    const parsed = JSON.parse(saved);
-                    this.data = { ...this.data, ...parsed };
+                    try {
+                        const parsed = JSON.parse(saved);
+                        this.data = { ...this.data, ...parsed };
+                    } catch(e) { console.error("JSON parse error", e); }
+                    
                     if(!this.data.flightOut) this.data.flightOut = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
                     if(!this.data.flightIn) this.data.flightIn = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
                     if(!this.data.destination) this.data.destination = "";
@@ -483,9 +494,15 @@
                         listContainer.appendChild(el);
                     });
 
+                    // V3.4 修正：加入 delay 讓手機可以捲動，不會一直誤觸拖曳
                     new Sortable(listContainer, {
                         animation: 150,
-                        onEnd: (evt) => { }
+                        delay: 200,         // 按住 200ms 後才開始拖曳
+                        delayOnTouchOnly: true, // 只有觸控裝置啟用延遲
+                        touchStartThreshold: 5, // 容許手指稍微抖動，不會馬上變成拖曳
+                        onEnd: (evt) => { 
+                            // 這裡可以加入重新排序的邏輯，目前保持畫面排序即可
+                        }
                     });
 
                     this.fetchWeather(dateStr, dayDiv.querySelector('.weather-tag'));
