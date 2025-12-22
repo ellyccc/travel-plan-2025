@@ -14,17 +14,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
-        /* V3.4 強制捲動修復與樣式設定 */
+        /* V3.5 樣式設定：包含強制捲動與輸入框優化 */
         html, body {
             background-color: #f5f5f5;
             color: #333333;
             font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Heiti TC', sans-serif;
             -webkit-font-smoothing: antialiased;
-            /* 關鍵修正：強制允許垂直捲動，覆蓋所有舊設定 */
+            /* 強制允許垂直捲動，防止手機版面卡死 */
             height: auto !important;
             min-height: 100vh;
             overflow-y: auto !important;
-            overscroll-behavior-y: none; /* 防止 iOS 橡皮筋回彈感，增加 App 感 */
+            overscroll-behavior-y: none;
         }
 
         /* 自定義邊框風格 */
@@ -54,7 +54,7 @@
             font-weight: bold;
         }
 
-        /* 拖曳時的樣式 (讓被拖曳的項目半透明) */
+        /* 拖曳時的樣式 */
         .sortable-ghost {
             opacity: 0.4;
             background-color: #e5e5e5;
@@ -119,7 +119,10 @@
                             <label class="text-[10px] text-gray-400 block uppercase">Airline / Flight No.</label>
                             <input type="text" id="flightNumOut" placeholder="JL096" onchange="app.saveData()">
                         </div>
-                        <div></div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Date</label>
+                            <input type="date" id="dateOut" class="text-xs" onchange="app.saveData()">
+                        </div>
                         <div>
                             <label class="text-[10px] text-gray-400 block uppercase">Departure</label>
                             <div class="flex gap-1 items-center">
@@ -149,7 +152,10 @@
                             <label class="text-[10px] text-gray-400 block uppercase">Airline / Flight No.</label>
                             <input type="text" id="flightNumIn" placeholder="JL099" onchange="app.saveData()">
                         </div>
-                        <div></div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block uppercase">Date</label>
+                            <input type="date" id="dateIn" class="text-xs" onchange="app.saveData()">
+                        </div>
                         <div>
                             <label class="text-[10px] text-gray-400 block uppercase">Departure</label>
                             <div class="flex gap-1 items-center">
@@ -314,10 +320,10 @@
                 destination: "Tokyo",
                 startDate: new Date().toISOString().split('T')[0],
                 endDate: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0],
-                flightOut: { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' },
-                flightIn: { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' },
+                // Updated flight structure to include date
+                flightOut: { num: '', date: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' },
+                flightIn: { num: '', date: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' },
                 
-                // Added siteUrl to item structure logic (implicit in save/load)
                 itinerary: [], 
                 packingList: [],
                 shoppingList: [],
@@ -335,7 +341,6 @@
                     this.renderAll();
                 } catch(e) {
                     console.error("Init error", e);
-                    // 默默處理錯誤，避免卡死
                 }
             },
 
@@ -348,6 +353,7 @@
                 
                 // Outbound
                 this.data.flightOut.num = document.getElementById('flightNumOut').value;
+                this.data.flightOut.date = document.getElementById('dateOut').value; // Save date
                 this.data.flightOut.depTime = document.getElementById('depTimeOut').value;
                 this.data.flightOut.arrTime = document.getElementById('arrTimeOut').value;
                 this.data.flightOut.depPlace = document.getElementById('depPlaceOut').value;
@@ -355,6 +361,7 @@
                 
                 // Inbound
                 this.data.flightIn.num = document.getElementById('flightNumIn').value;
+                this.data.flightIn.date = document.getElementById('dateIn').value; // Save date
                 this.data.flightIn.depTime = document.getElementById('depTimeIn').value;
                 this.data.flightIn.arrTime = document.getElementById('arrTimeIn').value;
                 this.data.flightIn.depPlace = document.getElementById('depPlaceIn').value;
@@ -374,8 +381,8 @@
                         this.data = { ...this.data, ...parsed };
                     } catch(e) { console.error("JSON parse error", e); }
                     
-                    if(!this.data.flightOut) this.data.flightOut = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
-                    if(!this.data.flightIn) this.data.flightIn = { num: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
+                    if(!this.data.flightOut) this.data.flightOut = { num: '', date: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
+                    if(!this.data.flightIn) this.data.flightIn = { num: '', date: '', depTime: '', arrTime: '', depPlace: '', arrPlace: '' };
                     if(!this.data.destination) this.data.destination = "";
                 }
                 document.getElementById('tripTitle').value = this.data.title;
@@ -383,13 +390,17 @@
                 document.getElementById('startDate').value = this.data.startDate;
                 document.getElementById('endDate').value = this.data.endDate;
                 
+                // Outbound Loading
                 document.getElementById('flightNumOut').value = this.data.flightOut.num || '';
+                document.getElementById('dateOut').value = this.data.flightOut.date || ''; // Load date
                 document.getElementById('depTimeOut').value = this.data.flightOut.depTime || '';
                 document.getElementById('arrTimeOut').value = this.data.flightOut.arrTime || '';
                 document.getElementById('depPlaceOut').value = this.data.flightOut.depPlace || '';
                 document.getElementById('arrPlaceOut').value = this.data.flightOut.arrPlace || '';
 
+                // Inbound Loading
                 document.getElementById('flightNumIn').value = this.data.flightIn.num || '';
+                document.getElementById('dateIn').value = this.data.flightIn.date || ''; // Load date
                 document.getElementById('depTimeIn').value = this.data.flightIn.depTime || '';
                 document.getElementById('arrTimeIn').value = this.data.flightIn.arrTime || '';
                 document.getElementById('depPlaceIn').value = this.data.flightIn.depPlace || '';
